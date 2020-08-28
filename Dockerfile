@@ -6,3 +6,5 @@ RUN /usr/local/bin/pip install --no-cache-dir --requirement /informatica-iics-ap
 ENV PYTHONUNBUFFERED="1"
 
 ENTRYPOINT ["/usr/local/bin/python"]
+
+COPY get-iics-sessions.py /informatica-iics-api/get-iics-sessions.py
