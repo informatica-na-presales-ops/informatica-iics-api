@@ -1,3 +1,5 @@
+import datetime
+import fort
 import logging
 import os
 import requests
@@ -7,6 +9,36 @@ import sys
 _version = '2020.0'
 
 log = logging.getLogger(__name__)
+
+
+class Database(fort.PostgresDatabase):
+    def add_user_login_timestamp(self, user_id: str, login_timestamp: datetime.datetime):
+        sql = '''
+            select event_id from environment_usage_events
+            where lower(environment_name) = lower(%(environment_name)s)
+              and lower(event_name) = lower(%(event_name)s)
+              and lower(user_id) = lower(%(user_id)s)
+              and event_time = %(event_time)s
+        '''
+        params = {
+            'environment_name': os.getenv('ENVIRONMENT_NAME').lower(),
+            'event_name': 'login',
+            'user_id': user_id.lower(),
+            'event_time': login_timestamp
+        }
+        existing = self.q_val(sql, params)
+        if existing is None:
+            self.log.info(f'Adding event to database: {user_id} at {login_timestamp}')
+            sql = '''
+                insert into environment_usage_events (
+                    environment_name, event_name, user_id, event_time
+                ) values (
+                    lower(%(environment_name)s), lower(%(event_name)s), lower(%(user_id)s), %(event_time)s
+                )
+            '''
+            self.u(sql, params)
+        else:
+            self.log.info(f'This event is already in the database: {user_id.lower()} at {login_timestamp}')
 
 
 class APIClient:
@@ -82,14 +114,20 @@ def set_up_logging():
     logging.getLogger().setLevel(log_level)
 
 
-def main():
-    set_up_logging()
+def main_job():
+    dsn = os.getenv('DB')
+    db = Database(dsn, maxconn=10)
     client = APIClient()
     for entry in client.get_security_log():
         if entry.get('actionEvent') == 'USER_LOGIN':
-            actor = entry.get('actor')
-            entry_time = entry.get('entryTime')
-            log.info(f'{actor} logged in at {entry_time}')
+            actor = entry.get('actor').lower()
+            entry_time = datetime.datetime.fromisoformat(entry.get('entryTime')[:-1])
+            db.add_user_login_timestamp(actor, entry_time)
+
+
+def main():
+    set_up_logging()
+    main_job()
 
 
 def handle_sigterm(_signal, _frame):
