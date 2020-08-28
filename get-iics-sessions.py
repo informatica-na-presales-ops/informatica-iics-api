@@ -1,3 +1,4 @@
+import apscheduler.schedulers.blocking
 import datetime
 import fort
 import logging
@@ -128,6 +129,12 @@ def main_job():
 def main():
     set_up_logging()
     main_job()
+    run_and_exit = os.getenv('RUN_AND_EXIT')
+    if run_and_exit is None:
+        scheduler = apscheduler.schedulers.blocking.BlockingScheduler()
+        sync_interval_hours = int(os.getenv('SYNC_INTERVAL_HOURS', 12))
+        scheduler.add_job(main_job, 'interval', hours=sync_interval_hours)
+        scheduler.start()
 
 
 def handle_sigterm(_signal, _frame):
