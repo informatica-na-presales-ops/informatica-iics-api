@@ -1,3 +1,4 @@
+--extra-index-url https://alpine-wheels.github.io/index
 fort==1.0.1
 psycopg2==2.8.5
 requests==2.24.0
