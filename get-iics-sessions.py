@@ -1,6 +1,7 @@
 import logging
 import os
 import requests
+import signal
 import sys
 
 _version = '2020.0'
@@ -13,7 +14,14 @@ class APIClient:
     _password = None
     _pod_region = None
     _session = requests.Session()
+    _session_id = None
     _username = None
+
+    @property
+    def base_api_url(self) -> str:
+        if self._base_api_url is None:
+            self.login()
+        return self._base_api_url
 
     def login(self):
         log.debug('Attempting login...')
@@ -23,7 +31,10 @@ class APIClient:
         }
         response = self._session.post(self.login_url, json=json)
         response.raise_for_status()
-        log.debug(response.json())
+        data = response.json()
+        self._base_api_url = data.get('products')[0].get('baseApiUrl')
+        self._session_id = data.get('userInfo').get('sessionId')
+        self._session.headers.update({'INFA-SESSION-ID': self._session_id})
 
     @property
     def login_url(self) -> str:
@@ -43,6 +54,13 @@ class APIClient:
         if self._pod_region is None:
             self._pod_region = os.getenv('POD_REGION', 'us')
         return self._pod_region
+
+    def get_security_log(self):
+        url = f'{self.base_api_url}/public/core/v3/securityLog?limit=1000'
+        response = self._session.get(url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get('entries')
 
     @property
     def username(self) -> str:
@@ -67,4 +85,17 @@ def set_up_logging():
 def main():
     set_up_logging()
     client = APIClient()
-    client.login()
+    for entry in client.get_security_log():
+        if entry.get('actionEvent') == 'USER_LOGIN':
+            actor = entry.get('actor')
+            entry_time = entry.get('entryTime')
+            log.info(f'{actor} logged in at {entry_time}')
+
+
+def handle_sigterm(_signal, _frame):
+    sys.exit()
+
+
+if __name__ == '__main__':
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    main()
