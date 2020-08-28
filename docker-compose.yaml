@@ -1,0 +1,5 @@
+version: '3.8'
+
+services:
+  iics-api:
+    image: docker.pkg.github.com/informatica-na-presales-ops/informatica-iics-api/informatica-iics-api
