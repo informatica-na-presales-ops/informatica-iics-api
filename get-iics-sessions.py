@@ -105,6 +105,19 @@ class APIClient:
         return self._username
 
 
+def reformat_actor(actor: str) -> str:
+    if actor.endswith('.saml'):
+        actor = actor[:-5]
+    if actor.endswith(('.saml2', '.saml3')):
+        actor = actor[:-6]
+    if '@' in actor:
+        parts = actor.split('@')
+        actor = f'{parts[1]}\\{parts[0]}'
+    if '\\' not in actor:
+        actor = f'none\\{actor}'
+    return actor.lower()
+
+
 def set_up_logging():
     log_format = os.getenv('LOG_FORMAT', '%(levelname)s [%(name)s] %(message)s')
     logging.basicConfig(format=log_format, level=logging.DEBUG, stream=sys.stdout)
@@ -121,7 +134,7 @@ def main_job():
     client = APIClient()
     for entry in client.get_security_log():
         if entry.get('actionEvent') == 'USER_LOGIN':
-            actor = entry.get('actor').lower()
+            actor = reformat_actor(entry.get('actor'))
             entry_time = datetime.datetime.fromisoformat(entry.get('entryTime')[:-1])
             db.add_user_login_timestamp(actor, entry_time)
 
