@@ -7,7 +7,7 @@ import requests
 import signal
 import sys
 
-_version = '2020.1'
+_version = '2020.2'
 
 log = logging.getLogger(__name__)
 
